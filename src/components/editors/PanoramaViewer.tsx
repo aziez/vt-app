@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Hotspot, Scene } from "@/lib/types";
+import { Hotspot, Scene, HotspotTemplate } from "@/lib/types";
 import { useTourStore } from "@/store/tourStore";
 import Marzipano from "marzipano";
 
@@ -10,10 +10,13 @@ interface PanoramaViewerProps {
 const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
   const viewerRef = useRef<HTMLDivElement>(null);
   const viewerInstanceRef = useRef<any>(null);
-  const { updateHotspot, setCurrentScene, tour } = useTourStore();
+  const { updateHotspot, setCurrentScene, tour, setHotspotTemplate } =
+    useTourStore();
   const [isAddingHotspot, setIsAddingHotspot] = useState(false);
   const [newHotspotType, setNewHotspotType] = useState<"info" | "link">("info");
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+  const [newHotspotTemplate, setNewHotspotTemplate] =
+    useState<HotspotTemplate>("default");
 
   useEffect(() => {
     if (!viewerRef.current) return;
@@ -60,23 +63,38 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
     };
   }, [scene]);
 
+  const createHotspotElement = (hotspot: Hotspot) => {
+    const element = document.createElement("div");
+    element.className = `hotspot ${hotspot.type}-hotspot ${hotspot.template}-template`;
+
+    switch (hotspot.template) {
+      case "circular":
+        element.style.borderRadius = "50%";
+        element.style.width = "40px";
+        element.style.height = "40px";
+        break;
+      case "square":
+        element.style.width = "40px";
+        element.style.height = "40px";
+        break;
+      default:
+        element.style.padding = "10px";
+        element.style.borderRadius = "5px";
+    }
+
+    element.style.backgroundColor =
+      hotspot.type === "info" ? "rgba(0, 0, 255, 0.5)" : "rgba(255, 0, 0, 0.5)";
+    element.style.color = "white";
+    element.textContent = hotspot.text;
+
+    return element;
+  };
+
   useEffect(() => {
     if (!viewerInstanceRef.current) return;
 
-    // Clear existing hotspots
-    // viewerInstanceRef.current.scene().hotspotContainer().destroyAll();
-
     scene.hotspots.forEach((hotspot) => {
-      const element = document.createElement("div");
-      element.className = `hotspot ${hotspot.type}-hotspot`;
-      element.style.backgroundColor =
-        hotspot.type === "info"
-          ? "rgba(0, 0, 255, 0.5)"
-          : "rgba(255, 0, 0, 0.5)";
-      element.style.color = "white";
-      element.style.padding = "10px";
-      element.style.borderRadius = "5px";
-      element.textContent = hotspot.text;
+      const element = createHotspotElement(hotspot);
 
       const hotspotInstance = viewerInstanceRef.current
         .scene()
@@ -168,13 +186,22 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
       pitch: coords.pitch,
       text: newHotspotType === "info" ? "New Info Hotspot" : "New Link Hotspot",
       type: newHotspotType,
-      linkedSceneId: newHotspotType === "link" ? selectedSceneId : undefined,
+      linkedSceneId:
+        newHotspotType === "link" ? selectedSceneId ?? undefined : undefined,
+      template: newHotspotTemplate,
     };
 
     useTourStore.getState().addHotspot(scene.id, newHotspot);
     setIsAddingHotspot(false);
     setNewHotspotType("info");
     setSelectedSceneId(null);
+  };
+
+  const handleHotspotTemplateChange = (
+    hotspotId: string,
+    template: HotspotTemplate
+  ) => {
+    setHotspotTemplate(scene.id, hotspotId, template);
   };
 
   return (

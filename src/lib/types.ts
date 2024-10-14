@@ -1,23 +1,22 @@
-// /lib/types.ts
+// / lib/epsty.ts
 
 export interface Tour {
   id: string;
   title: string;
   scenes: Scene[];
+  initialSceneId: string;
+  template: TourTemplate;
 }
 
 export interface Scene {
   id: string;
-  title: string;
   name: string;
   panoramaUrl: string;
+  thumbnail: string;
   hotspots: Hotspot[];
-  initialViewParameters: {
-    yaw: number;
-    pitch: number;
-    fov: number;
-  };
+  initialViewParameters: ViewParameters;
 }
+
 export interface Hotspot {
   id: string;
   type: "info" | "link";
@@ -25,6 +24,7 @@ export interface Hotspot {
   yaw: number;
   pitch: number;
   linkedSceneId?: string;
+  template: HotspotTemplate;
 }
 
 export interface ViewParameters {
@@ -32,3 +32,6 @@ export interface ViewParameters {
   pitch: number;
   fov: number;
 }
+
+export type TourTemplate = "default" | "modern" | "vintage";
+export type HotspotTemplate = "default" | "circular" | "square";

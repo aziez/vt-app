@@ -1,6 +1,6 @@
 "use client";
 
-import TourEditor from "@/components/editors/TourEditor";
+import TourEditor from "@/pages/editor/TourEditor";
 import { useParams } from "next/navigation";
 
 export default function TourPage() {
