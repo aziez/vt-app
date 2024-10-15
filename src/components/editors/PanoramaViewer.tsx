@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Hotspot, Scene, HotspotTemplate } from "@/lib/types";
 import { useTourStore } from "@/store/tourStore";
-import Marzipano from "marzipano";
+import * as Marzipano from "marzipano";
+import { createHotspotElement } from "../templates/HotspotsElement";
+import ExportButton from "./exporters/exportButton";
 
 interface PanoramaViewerProps {
   scene: Scene;
@@ -9,22 +11,18 @@ interface PanoramaViewerProps {
 
 const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
   const viewerRef = useRef<HTMLDivElement>(null);
-  const viewerInstanceRef = useRef<any>(null);
-  const { updateHotspot, setCurrentScene, tour, setHotspotTemplate } =
-    useTourStore();
+  const viewerInstanceRef = useRef<Marzipano.Viewer | null>(null);
+  const { setCurrentScene, tour, addHotspot } = useTourStore();
   const [isAddingHotspot, setIsAddingHotspot] = useState(false);
   const [newHotspotType, setNewHotspotType] = useState<"info" | "link">("info");
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
-  const [newHotspotTemplate, setNewHotspotTemplate] =
-    useState<HotspotTemplate>("default");
+  const [newHotspotTemplate] = useState<HotspotTemplate>("default");
 
-  useEffect(() => {
+  const initializeViewer = useCallback(() => {
     if (!viewerRef.current) return;
 
     const viewerOpts = {
-      controls: {
-        mouseViewMode: "drag",
-      },
+      controls: { mouseViewMode: "drag" },
     };
 
     viewerInstanceRef.current = new Marzipano.Viewer(
@@ -39,170 +37,93 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
       (100 * Math.PI) / 180
     );
     const view = new Marzipano.RectilinearView(
-      {
-        yaw: scene.initialViewParameters.yaw,
-        pitch: scene.initialViewParameters.pitch,
-        fov: scene.initialViewParameters.fov,
-      },
+      scene.initialViewParameters,
       limiter
     );
 
     const sceneInstance = viewerInstanceRef.current.createScene({
-      source: source,
-      geometry: geometry,
-      view: view,
+      source,
+      geometry,
+      view,
       pinFirstLevel: true,
     });
 
     sceneInstance.switchTo();
+  }, [scene.panoramaUrl, scene.initialViewParameters]);
 
-    return () => {
-      if (viewerInstanceRef.current) {
-        viewerInstanceRef.current.destroy();
-      }
-    };
-  }, [scene]);
-
-  const createHotspotElement = (hotspot: Hotspot) => {
-    const element = document.createElement("div");
-    element.className = `hotspot ${hotspot.type}-hotspot ${hotspot.template}-template`;
-
-    switch (hotspot.template) {
-      case "circular":
-        element.style.borderRadius = "50%";
-        element.style.width = "40px";
-        element.style.height = "40px";
-        break;
-      case "square":
-        element.style.width = "40px";
-        element.style.height = "40px";
-        break;
-      default:
-        element.style.padding = "10px";
-        element.style.borderRadius = "5px";
-    }
-
-    element.style.backgroundColor =
-      hotspot.type === "info" ? "rgba(0, 0, 255, 0.5)" : "rgba(255, 0, 0, 0.5)";
-    element.style.color = "white";
-    element.textContent = hotspot.text;
-
-    return element;
-  };
-
-  useEffect(() => {
+  const createHotspots = useCallback(() => {
     if (!viewerInstanceRef.current) return;
 
     scene.hotspots.forEach((hotspot) => {
       const element = createHotspotElement(hotspot);
 
-      const hotspotInstance = viewerInstanceRef.current
-        .scene()
+      viewerInstanceRef
+        .current!.scene()
         .hotspotContainer()
-        .createHotspot(element, { yaw: hotspot.yaw, pitch: hotspot.pitch });
-
-      // Make hotspot draggable
-      dragElement(element, hotspotInstance, hotspot);
+        .createHotspot(element, {
+          yaw: hotspot.yaw,
+          pitch: hotspot.pitch,
+        });
 
       element.addEventListener("click", (e) => {
         e.stopPropagation();
         if (hotspot.type === "info") {
-          alert(hotspot.text); // Show info popup
+          alert(hotspot.text);
         } else if (hotspot.type === "link" && hotspot.linkedSceneId) {
           setCurrentScene(hotspot.linkedSceneId);
         }
       });
     });
-  }, [scene.hotspots, updateHotspot, setCurrentScene]);
+  }, [scene.hotspots, setCurrentScene]);
 
-  const dragElement = (
-    element: HTMLElement,
-    hotspotInstance: any,
-    hotspot: Hotspot
-  ) => {
-    let isDragging = false;
-    let previousX = 0;
-    let previousY = 0;
-
-    const dragMouseDown = (e: MouseEvent) => {
-      e.preventDefault();
-      isDragging = true;
-      previousX = e.clientX;
-      previousY = e.clientY;
-      document.addEventListener("mousemove", elementDrag);
-      document.addEventListener("mouseup", closeDragElement);
+  useEffect(() => {
+    initializeViewer();
+    return () => {
+      if (viewerInstanceRef.current) {
+        viewerInstanceRef.current.destroy();
+      }
     };
+  }, [initializeViewer]);
 
-    const elementDrag = (e: MouseEvent) => {
-      e.preventDefault();
-      if (!isDragging) return;
+  useEffect(() => {
+    createHotspots();
+  }, [createHotspots]);
 
-      const deltaX = previousX - e.clientX;
-      const deltaY = previousY - e.clientY;
-      previousX = e.clientX;
-      previousY = e.clientY;
+  const handleClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (!viewerInstanceRef.current || !isAddingHotspot) return;
 
-      const view = viewerInstanceRef.current.scene().view();
-      const fov = view.fov();
-      const hfov =
-        (fov * viewerInstanceRef.current.stage().width()) /
-        viewerInstanceRef.current.stage().height();
-
-      const position = hotspotInstance.position();
-      position.yaw -=
-        (deltaX * hfov) / viewerInstanceRef.current.stage().width();
-      position.pitch +=
-        (deltaY * fov) / viewerInstanceRef.current.stage().height();
-
-      hotspotInstance.setPosition(position);
-    };
-
-    const closeDragElement = () => {
-      isDragging = false;
-      document.removeEventListener("mousemove", elementDrag);
-      document.removeEventListener("mouseup", closeDragElement);
-
-      const position = hotspotInstance.position();
-      updateHotspot(scene.id, hotspot.id, {
-        yaw: position.yaw,
-        pitch: position.pitch,
+      const coords = viewerInstanceRef.current.view().screenToCoordinates({
+        x: event.nativeEvent.offsetX,
+        y: event.nativeEvent.offsetY,
       });
-    };
 
-    // element.addEventListener("mousedown", dragMouseDown);
-  };
+      const newHotspot: Hotspot = {
+        id: `hotspot-${Date.now()}`,
+        yaw: coords.yaw,
+        pitch: coords.pitch,
+        text:
+          newHotspotType === "info" ? "New Info Hotspot" : "New Link Hotspot",
+        type: newHotspotType,
+        linkedSceneId:
+          newHotspotType === "link" ? selectedSceneId ?? undefined : undefined,
+        template: newHotspotTemplate,
+      };
 
-  const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!viewerInstanceRef.current || !isAddingHotspot) return;
-
-    const coords = viewerInstanceRef.current.view().screenToCoordinates({
-      x: event.nativeEvent.offsetX,
-      y: event.nativeEvent.offsetY,
-    });
-
-    const newHotspot: Hotspot = {
-      id: `hotspot-${Date.now()}`,
-      yaw: coords.yaw,
-      pitch: coords.pitch,
-      text: newHotspotType === "info" ? "New Info Hotspot" : "New Link Hotspot",
-      type: newHotspotType,
-      linkedSceneId:
-        newHotspotType === "link" ? selectedSceneId ?? undefined : undefined,
-      template: newHotspotTemplate,
-    };
-
-    useTourStore.getState().addHotspot(scene.id, newHotspot);
-    setIsAddingHotspot(false);
-    setNewHotspotType("info");
-    setSelectedSceneId(null);
-  };
-
-  const handleHotspotTemplateChange = (
-    hotspotId: string,
-    template: HotspotTemplate
-  ) => {
-    setHotspotTemplate(scene.id, hotspotId, template);
-  };
+      addHotspot(scene.id, newHotspot);
+      setIsAddingHotspot(false);
+      setNewHotspotType("info");
+      setSelectedSceneId(null);
+    },
+    [
+      isAddingHotspot,
+      newHotspotType,
+      selectedSceneId,
+      newHotspotTemplate,
+      addHotspot,
+      scene.id,
+    ]
+  );
 
   return (
     <div className="relative w-full h-full">
@@ -244,6 +165,7 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
             )}
           </>
         )}
+        <ExportButton tour={tour} />
       </div>
     </div>
   );

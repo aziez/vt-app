@@ -19,11 +19,13 @@ const storage: StateStorage = {
       if (value) {
         return LZString.decompressFromUTF16(value);
       }
-      return await idb.get(name);
+      const idbValue = await idb.get(name);
+      return idbValue !== undefined ? idbValue : null; // Convert undefined to null
     } catch {
       return null;
     }
   },
+
   setItem: async (name: string, value: string): Promise<void> => {
     try {
       const compressedValue = LZString.compressToUTF16(value);
@@ -185,22 +187,13 @@ export const useTourStore = create<TourState>()(
                 ...state.tour,
                 scenes: state.tour.scenes.map((scene) =>
                   scene.id === sceneId
-                    ? {
-                        ...scene,
-                        initialViewParameters: {
-                          ...scene.initialViewParameters,
-                          ...params,
-                        },
-                      }
+                    ? { ...scene, viewParameters: params }
                     : scene
                 ),
               }
             : null,
         })),
     }),
-    {
-      name: "tour-storage",
-      storage: storage,
-    }
+    { name: "tour", storage }
   )
 );
