@@ -29,8 +29,8 @@ const ExportButton = ({ tour }: { tour: Tour | null }) => {
     <Button
       onClick={handleExport}
       disabled={isLoading}
-      variant="secondary"
-      className="relative"
+      variant="default"
+      className="absolute bottom-2 right-2"
     >
       {isLoading && (
         <Loader2 className="absolute left-3 h-5 w-5 animate-spin text-white" />

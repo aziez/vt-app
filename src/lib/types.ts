@@ -20,7 +20,12 @@ export interface Scene {
 export interface Hotspot {
   id: string;
   type: "info" | "link";
-  text: string;
+  title?: string;
+  text?: string;
+  description?: string;
+  url?: string;
+  imageUrl?: string;
+  revealImageUrl?: string;
   yaw: number;
   pitch: number;
   linkedSceneId?: string;
@@ -34,4 +39,12 @@ export interface ViewParameters {
 }
 
 export type TourTemplate = "default" | "modern" | "vintage";
-export type HotspotTemplate = "default" | "circular" | "square";
+
+export type HotspotTemplate =
+  | "expand"
+  | "hintspot"
+  | "info"
+  | "reveal"
+  | "rotate"
+  | "textInfo"
+  | "tooltip";

@@ -4,10 +4,35 @@ import { useTourStore } from "@/store/tourStore";
 import * as Marzipano from "marzipano";
 import { createHotspotElement } from "../templates/HotspotsElement";
 import ExportButton from "./exporters/exportButton";
+import { Button } from "@/components/ui/button";
+import HotspotEditor from "./hotspots/HotspotEditor";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
+import { PlusCircle, X } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 interface PanoramaViewerProps {
   scene: Scene;
 }
+const hotspotTemplateOptions: HotspotTemplate[] = [
+  "expand",
+  "hintspot",
+  "info",
+  "reveal",
+  "rotate",
+  "textInfo",
+  "tooltip",
+];
 
 const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -16,7 +41,8 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
   const [isAddingHotspot, setIsAddingHotspot] = useState(false);
   const [newHotspotType, setNewHotspotType] = useState<"info" | "link">("info");
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
-  const [newHotspotTemplate] = useState<HotspotTemplate>("default");
+  const [newHotspotTemplate, setNewHotspotTemplate] =
+    useState<HotspotTemplate>("expand");
 
   const initializeViewer = useCallback(() => {
     if (!viewerRef.current) return;
@@ -54,10 +80,12 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
   const createHotspots = useCallback(() => {
     if (!viewerInstanceRef.current) return;
 
+    // viewerInstanceRef.current.scene().hotspotContainer().destroyAll();
+
     scene.hotspots.forEach((hotspot) => {
       const element = createHotspotElement(hotspot);
 
-      viewerInstanceRef
+      const marzipanoHotspot = viewerInstanceRef
         .current!.scene()
         .hotspotContainer()
         .createHotspot(element, {
@@ -129,44 +157,94 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
     <div className="relative w-full h-full">
       <div ref={viewerRef} className="w-full h-full" onClick={handleClick} />
       <div className="absolute top-4 left-4 bg-white p-4 rounded shadow">
-        <button
-          onClick={() => setIsAddingHotspot(!isAddingHotspot)}
-          className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
-        >
-          {isAddingHotspot ? "Cancel" : "Add Hotspot"}
-        </button>
-        {isAddingHotspot && (
-          <>
-            <select
-              value={newHotspotType}
-              onChange={(e) =>
-                setNewHotspotType(e.target.value as "info" | "link")
-              }
-              className="mr-2"
-            >
-              <option value="info">Info Hotspot</option>
-              <option value="link">Link Hotspot</option>
-            </select>
-            {newHotspotType === "link" && (
-              <select
-                value={selectedSceneId || ""}
-                onChange={(e) => setSelectedSceneId(e.target.value)}
-                className="mr-2"
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={() => setIsAddingHotspot(!isAddingHotspot)}
+                className="w-full flex items-center justify-center"
+                variant={isAddingHotspot ? "destructive" : "default"}
               >
-                <option value="">Select a scene</option>
-                {tour?.scenes
-                  .filter((s) => s.id !== scene.id)
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-              </select>
+                {isAddingHotspot ? (
+                  <>
+                    <X className="w-4 h-4 mr-2" /> Cancel
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="w-4 h-4 mr-2" /> Add Hotspot
+                  </>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                {isAddingHotspot
+                  ? "Cancel adding hotspot"
+                  : "Add a new hotspot to the scene"}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        {isAddingHotspot && (
+          <div className="space-y-3">
+            <Select
+              value={newHotspotType}
+              onValueChange={(value) =>
+                setNewHotspotType(value as "info" | "link")
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select hotspot type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="info">Info Hotspot</SelectItem>
+                <SelectItem value="link">Link Hotspot</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={newHotspotTemplate}
+              onValueChange={(value) =>
+                setNewHotspotTemplate(value as HotspotTemplate)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select hotspot template" />
+              </SelectTrigger>
+              <SelectContent>
+                {hotspotTemplateOptions.map((template) => (
+                  <SelectItem key={template} value={template}>
+                    {template.charAt(0).toUpperCase() + template.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {newHotspotType === "link" && (
+              <Select
+                value={selectedSceneId || ""}
+                onValueChange={(value) => setSelectedSceneId(value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a scene" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tour?.scenes
+                    .filter((s) => s.id !== scene.id)
+                    .map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             )}
-          </>
+            <p className="text-sm text-gray-600">
+              Click on the panorama to place the hotspot
+            </p>
+          </div>
         )}
-        <ExportButton tour={tour} />
       </div>
+      <ExportButton tour={tour} />
+      <HotspotEditor scene={scene} />
     </div>
   );
 };

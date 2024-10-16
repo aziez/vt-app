@@ -4,8 +4,8 @@ import { useTourStore } from "@/store/tourStore";
 import { Loader2 } from "lucide-react";
 import SceneManager from "@/components/editors/SceneManager";
 import PanoramaViewer from "@/components/editors/PanoramaViewer";
-import HotspotEditor from "@/components/editors/HotspotEditor";
 import TourDialog from "@/components/editors/createModal";
+import HotspotEditor from "@/components/editors/hotspots/HotspotEditor";
 
 interface TourEditorProps {
   tourId?: string;
@@ -17,6 +17,9 @@ const TourEditor: React.FC<TourEditorProps> = ({ tourId }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(true); // Use Dialog state
   const [tourTitle, setTourTitle] = useState("");
   const [tourTemplate, setTourTemplate] = useState("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   useEffect(() => {
     const fetchTour = async () => {
@@ -86,17 +89,12 @@ const TourEditor: React.FC<TourEditorProps> = ({ tourId }) => {
 
   return (
     <div className="flex h-screen">
-      <SceneManager />
+      <SceneManager isOpen={isSidebarOpen} onToggle={toggleSidebar} />
       <div className="flex-1 flex flex-col">
         <div className="flex-1">
           {currentScene && <PanoramaViewer scene={currentScene} />}
         </div>
-        <div className="h-1/3 bg-gray-200 p-4 overflow-y-auto">
-          {currentScene && <HotspotEditor scene={currentScene} />}
-        </div>
       </div>
-
-      {/* Use the TourDialog component */}
       <TourDialog
         isOpen={isDialogOpen}
         setIsOpen={setIsDialogOpen}
