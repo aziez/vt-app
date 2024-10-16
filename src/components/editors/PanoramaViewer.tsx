@@ -37,7 +37,11 @@ const hotspotTemplateOptions: HotspotTemplate[] = [
 const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
   const viewerRef = useRef<HTMLDivElement>(null);
   const viewerInstanceRef = useRef<Marzipano.Viewer | null>(null);
-  const { setCurrentScene, tour, addHotspot } = useTourStore();
+  const sceneInstanceRef = useRef<Marzipano.Scene | null>(null);
+  const hotspotContainerRef = useRef<Marzipano.HotspotContainer | null>(null);
+
+  const { setCurrentScene, tour, addHotspot, updateHotspot, removeHotspot } =
+    useTourStore();
   const [isAddingHotspot, setIsAddingHotspot] = useState(false);
   const [newHotspotType, setNewHotspotType] = useState<"info" | "link">("info");
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
@@ -67,40 +71,47 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
       limiter
     );
 
-    const sceneInstance = viewerInstanceRef.current.createScene({
+    sceneInstanceRef.current = viewerInstanceRef.current.createScene({
       source,
       geometry,
       view,
       pinFirstLevel: true,
     });
 
-    sceneInstance.switchTo();
+    hotspotContainerRef.current = sceneInstanceRef.current.hotspotContainer();
+
+    sceneInstanceRef.current.switchTo();
   }, [scene.panoramaUrl, scene.initialViewParameters]);
 
   const createHotspots = useCallback(() => {
     if (!viewerInstanceRef.current) return;
+    //
+    hotspotContainerRef.current.listHotspots().forEach((hotspot: Hotspot) => {
+      hotspotContainerRef.current?.destroyHotspot(hotspot);
+    });
 
-    // viewerInstanceRef.current.scene().hotspotContainer().destroyAll();
-
+    // Create new hotspots
     scene.hotspots.forEach((hotspot) => {
       const element = createHotspotElement(hotspot);
 
-      const marzipanoHotspot = viewerInstanceRef
-        .current!.scene()
-        .hotspotContainer()
-        .createHotspot(element, {
+      const marzipanoHotspot = hotspotContainerRef.current?.createHotspot(
+        element,
+        {
           yaw: hotspot.yaw,
           pitch: hotspot.pitch,
-        });
-
-      element.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (hotspot.type === "info") {
-          alert(hotspot.text);
-        } else if (hotspot.type === "link" && hotspot.linkedSceneId) {
-          setCurrentScene(hotspot.linkedSceneId);
         }
-      });
+      );
+
+      if (marzipanoHotspot) {
+        marzipanoHotspot.domElement().addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (hotspot.type === "info") {
+            alert(hotspot.text);
+          } else if (hotspot.type === "link" && hotspot.linkedSceneId) {
+            setCurrentScene(hotspot.linkedSceneId);
+          }
+        });
+      }
     });
   }, [scene.hotspots, setCurrentScene]);
 
@@ -151,6 +162,20 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
       addHotspot,
       scene.id,
     ]
+  );
+
+  const handleUpdateHotspot = useCallback(
+    (hotspotId: string, updates: Partial<Hotspot>) => {
+      updateHotspot(scene.id, hotspotId, updates);
+    },
+    [updateHotspot, scene.id]
+  );
+
+  const handleRemoveHotspot = useCallback(
+    (hotspotId: string) => {
+      removeHotspot(scene.id, hotspotId);
+    },
+    [removeHotspot, scene.id]
   );
 
   return (
@@ -244,7 +269,11 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
         )}
       </div>
       <ExportButton tour={tour} />
-      <HotspotEditor scene={scene} />
+      <HotspotEditor
+        scene={scene}
+        onUpdateHotspot={handleUpdateHotspot}
+        onRemoveHotspot={handleRemoveHotspot}
+      />{" "}
     </div>
   );
 };

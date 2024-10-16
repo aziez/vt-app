@@ -1,6 +1,5 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback } from "react";
 import { Scene, Hotspot, HotspotTemplate } from "@/lib/types";
-import { useTourStore } from "@/store/tourStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,37 +22,33 @@ import { Menu, Pencil, Trash2, X } from "lucide-react";
 
 interface HotspotEditorProps {
   scene: Scene;
+  onUpdateHotspot: (hotspotId: string, updates: Partial<Hotspot>) => void;
+  onRemoveHotspot: (hotspotId: string) => void;
 }
 
-const HotspotEditor: React.FC<HotspotEditorProps> = ({ scene }) => {
-  const { updateHotspot, removeHotspot, setHotspotTemplate } = useTourStore();
-  const [isOpen, setIsOpen] = useState(false);
+const HotspotEditor: React.FC<HotspotEditorProps> = ({
+  scene,
+  onUpdateHotspot,
+  onRemoveHotspot,
+}) => {
+  const [isOpen, setIsOpen] = React.useState(false);
 
   const handleHotspotUpdate = useCallback(
     (hotspot: Hotspot, field: keyof Hotspot, value: string | number) => {
       if (hotspot && hotspot.id) {
-        updateHotspot(scene.id, hotspot.id, { [field]: value });
+        onUpdateHotspot(hotspot.id, { [field]: value });
       }
     },
-    [updateHotspot, scene.id]
+    [onUpdateHotspot]
   );
 
   const handleTemplateChange = useCallback(
     (hotspotId: string, template: HotspotTemplate) => {
       if (hotspotId) {
-        setHotspotTemplate(scene.id, hotspotId, template);
+        onUpdateHotspot(hotspotId, { template });
       }
     },
-    [setHotspotTemplate, scene.id]
-  );
-
-  const handleRemoveHotspot = useCallback(
-    (hotspotId: string) => {
-      if (hotspotId) {
-        removeHotspot(scene.id, hotspotId);
-      }
-    },
-    [removeHotspot, scene.id]
+    [onUpdateHotspot]
   );
 
   const hotspotTemplateOptions: HotspotTemplate[] = [
@@ -179,7 +174,7 @@ const HotspotEditor: React.FC<HotspotEditorProps> = ({ scene }) => {
                       </Select>
                     </div>
                     <Button
-                      onClick={() => handleRemoveHotspot(hotspot.id)}
+                      onClick={() => onRemoveHotspot(hotspot.id)}
                       variant="destructive"
                       className="w-full"
                     >
