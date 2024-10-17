@@ -129,19 +129,6 @@ const HotspotEditor: React.FC<HotspotEditorProps> = ({
                             )
                           }
                         />
-                        <Input
-                          type="number"
-                          value={hotspot[field as keyof Hotspot] || 0}
-                          onChange={(e) =>
-                            handleHotspotUpdate(
-                              hotspot,
-                              field as keyof Hotspot,
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          className="mt-1"
-                          step="0.1"
-                        />
                       </div>
                     ))}
                     <div className="space-y-2">

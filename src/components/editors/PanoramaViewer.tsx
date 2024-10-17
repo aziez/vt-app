@@ -80,7 +80,9 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
 
     hotspotContainerRef.current = sceneInstanceRef.current.hotspotContainer();
 
-    sceneInstanceRef.current.switchTo();
+    sceneInstanceRef.current.switchTo({
+      transitionDuration: 1000,
+    });
   }, [scene.panoramaUrl, scene.initialViewParameters]);
 
   const createHotspots = useCallback(() => {
@@ -90,7 +92,6 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
       hotspotContainerRef.current?.destroyHotspot(hotspot);
     });
 
-    // Create new hotspots
     scene.hotspots.forEach((hotspot) => {
       const element = createHotspotElement(hotspot);
 
@@ -103,11 +104,8 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
       );
 
       if (marzipanoHotspot) {
-        marzipanoHotspot.domElement().addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (hotspot.type === "info") {
-            alert(hotspot.text);
-          } else if (hotspot.type === "link" && hotspot.linkedSceneId) {
+        marzipanoHotspot.domElement().addEventListener("click", () => {
+          if (hotspot.type === "link" && hotspot.linkedSceneId) {
             setCurrentScene(hotspot.linkedSceneId);
           }
         });
@@ -181,7 +179,7 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({ scene }) => {
   return (
     <div className="relative w-full h-full">
       <div ref={viewerRef} className="w-full h-full" onClick={handleClick} />
-      <div className="absolute top-4 left-4 bg-white p-4 rounded shadow">
+      <div className="absolute top-4 left-4 bg-white p-4 rounded shadow hotspot">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
