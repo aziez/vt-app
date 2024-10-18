@@ -19,11 +19,12 @@ export interface Scene {
 
 export interface Hotspot {
   id: string;
-  type: "info" | "link";
+  type: "info" | "link" | "embed";
   title?: string;
   text?: string;
   description?: string;
   url?: string;
+  embedUrl?: string;
   imageUrl?: string;
   revealImageUrl?: string;
   yaw: number;
@@ -47,4 +48,5 @@ export type HotspotTemplate =
   | "reveal"
   | "rotate"
   | "textInfo"
-  | "tooltip";
+  | "tooltip"
+  | "embed";

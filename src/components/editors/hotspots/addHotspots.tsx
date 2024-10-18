@@ -1,13 +1,16 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useState } from "react";
 import { Hotspot, Scene, HotspotTemplate } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { PlusCircle, X } from "lucide-react";
+import { PlusCircle, X, Upload } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -15,14 +18,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import * as Marzipano from "marzipano";
+
+// Extended Hotspot type to include new fields
+interface ExtendedHotspot extends Hotspot {
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  embedUrl?: string;
+}
 
 interface HotspotControlsProps {
   scene: Scene;
-  tour: any; // Replace 'any' with your actual Tour type
+  tour: any;
   viewerInstance: Marzipano.Viewer | null;
   isAddingHotspot: boolean;
   setIsAddingHotspot: (value: boolean) => void;
-  addHotspot: (sceneId: string, hotspot: Hotspot) => void;
+  addHotspot: (sceneId: string, hotspot: ExtendedHotspot) => void;
 }
 
 const hotspotTemplateOptions: HotspotTemplate[] = [
@@ -33,6 +45,7 @@ const hotspotTemplateOptions: HotspotTemplate[] = [
   "rotate",
   "textInfo",
   "tooltip",
+  "embed", // Added new template type
 ];
 
 const HotspotControls: React.FC<HotspotControlsProps> = ({
@@ -43,30 +56,71 @@ const HotspotControls: React.FC<HotspotControlsProps> = ({
   setIsAddingHotspot,
   addHotspot,
 }) => {
-  const [newHotspotType, setNewHotspotType] = useState<"info" | "link">("info");
+  const [newHotspotType, setNewHotspotType] = useState<
+    "info" | "link" | "embed"
+  >("info");
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [newHotspotTemplate, setNewHotspotTemplate] =
     useState<HotspotTemplate>("expand");
 
-  const handleAddHotspot = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
+  // New state for additional fields
+  const [hotspotTitle, setHotspotTitle] = useState("");
+  const [hotspotText, setHotspotText] = useState("");
+  const [hotspotDescription, setHotspotDescription] = useState("");
+  const [hotspotImage, setHotspotImage] = useState<File | null>(null);
+  const [embedUrl, setEmbedUrl] = useState("");
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
+  const resetHotspotState = useCallback(() => {
+    setIsAddingHotspot(false);
+    setNewHotspotType("info");
+    setSelectedSceneId(null);
+    setNewHotspotTemplate("expand");
+    setHotspotTitle("");
+    setHotspotText("");
+    setHotspotDescription("");
+    setHotspotImage(null);
+    setEmbedUrl("");
+    setPreviewImageUrl(null);
+  }, [setIsAddingHotspot]);
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setHotspotImage(file);
+      // Create a preview URL for the uploaded image
+      const imageUrl = URL.createObjectURL(file);
+      setPreviewImageUrl(imageUrl);
+    }
+  };
+
+  const handleViewerClick = useCallback(
+    (event: MouseEvent) => {
       if (!viewerInstance || !isAddingHotspot) return;
 
+      const viewerElement = viewerInstance.domElement();
+      const rect = viewerElement.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
       const coords = viewerInstance.view().screenToCoordinates({
-        x: event.nativeEvent.offsetX,
-        y: event.nativeEvent.offsetY,
+        x,
+        y,
       });
 
-      const newHotspot: Hotspot = {
+      const newHotspot: ExtendedHotspot = {
         id: `hotspot-${Date.now()}`,
         yaw: coords.yaw,
         pitch: coords.pitch,
-        text:
-          newHotspotType === "info" ? "New Info Hotspot" : "New Link Hotspot",
+        text: hotspotText || "New Hotspot",
         type: newHotspotType,
         linkedSceneId:
-          newHotspotType === "link" ? selectedSceneId ?? undefined : undefined,
+          newHotspotType === "link" ? (selectedSceneId as string) : undefined,
         template: newHotspotTemplate,
+        title: hotspotTitle,
+        description: hotspotDescription,
+        imageUrl: previewImageUrl || undefined,
+        embedUrl: newHotspotType === "embed" ? embedUrl : undefined,
       };
 
       addHotspot(scene.id, newHotspot);
@@ -78,17 +132,16 @@ const HotspotControls: React.FC<HotspotControlsProps> = ({
       newHotspotType,
       selectedSceneId,
       newHotspotTemplate,
-      scene.id,
+      hotspotTitle,
+      hotspotText,
+      hotspotDescription,
+      previewImageUrl,
+      embedUrl,
       addHotspot,
+      scene.id,
+      resetHotspotState,
     ]
   );
-
-  const resetHotspotState = useCallback(() => {
-    setIsAddingHotspot(false);
-    setNewHotspotType("info");
-    setSelectedSceneId(null);
-    setNewHotspotTemplate("expand");
-  }, [setIsAddingHotspot]);
 
   const toggleAddHotspotMode = useCallback(() => {
     if (isAddingHotspot) {
@@ -98,14 +151,24 @@ const HotspotControls: React.FC<HotspotControlsProps> = ({
     }
   }, [isAddingHotspot, resetHotspotState, setIsAddingHotspot]);
 
+  React.useEffect(() => {
+    const viewerElement = viewerInstance?.domElement();
+    if (viewerElement && isAddingHotspot) {
+      viewerElement.addEventListener("click", handleViewerClick);
+      return () => {
+        viewerElement.removeEventListener("click", handleViewerClick);
+      };
+    }
+  }, [viewerInstance, isAddingHotspot, handleViewerClick]);
+
   return (
-    <div className="absolute top-4 left-4 bg-white p-4 rounded shadow hotspot">
+    <div className="absolute top-4 left-4 bg-white p-4 rounded shadow hotspot max-w-md">
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               onClick={toggleAddHotspotMode}
-              className="w-full flex items-center justify-center"
+              className="w-full flex items-center justify-center mb-4"
               variant={isAddingHotspot ? "destructive" : "default"}
             >
               {isAddingHotspot ? (
@@ -134,7 +197,7 @@ const HotspotControls: React.FC<HotspotControlsProps> = ({
           <Select
             value={newHotspotType}
             onValueChange={(value) =>
-              setNewHotspotType(value as "info" | "link")
+              setNewHotspotType(value as "info" | "link" | "embed")
             }
           >
             <SelectTrigger className="w-full">
@@ -143,6 +206,7 @@ const HotspotControls: React.FC<HotspotControlsProps> = ({
             <SelectContent>
               <SelectItem value="info">Info Hotspot</SelectItem>
               <SelectItem value="link">Link Hotspot</SelectItem>
+              <SelectItem value="embed">Embed Hotspot</SelectItem>
             </SelectContent>
           </Select>
 
@@ -164,6 +228,56 @@ const HotspotControls: React.FC<HotspotControlsProps> = ({
             </SelectContent>
           </Select>
 
+          <Input
+            placeholder="Hotspot Title"
+            value={hotspotTitle}
+            onChange={(e) => setHotspotTitle(e.target.value)}
+          />
+
+          <Input
+            placeholder="Hotspot Text"
+            value={hotspotText}
+            onChange={(e) => setHotspotText(e.target.value)}
+          />
+
+          <Textarea
+            placeholder="Hotspot Description"
+            value={hotspotDescription}
+            onChange={(e) => setHotspotDescription(e.target.value)}
+            rows={3}
+          />
+
+          {newHotspotType === "info" && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Upload Image
+              </label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="flex-1"
+                />
+                {previewImageUrl && (
+                  <img
+                    src={previewImageUrl}
+                    alt="Preview"
+                    className="w-12 h-12 object-cover rounded"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {newHotspotType === "embed" && (
+            <Input
+              placeholder="Embed URL (e.g., website URL)"
+              value={embedUrl}
+              onChange={(e) => setEmbedUrl(e.target.value)}
+            />
+          )}
+
           {newHotspotType === "link" && (
             <Select
               value={selectedSceneId || ""}
@@ -174,8 +288,8 @@ const HotspotControls: React.FC<HotspotControlsProps> = ({
               </SelectTrigger>
               <SelectContent>
                 {tour?.scenes
-                  .filter((s) => s.id !== scene.id)
-                  .map((s) => (
+                  .filter((s: Scene) => s.id !== scene.id)
+                  .map((s: Scene) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
                     </SelectItem>
